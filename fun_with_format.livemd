@@ -1,0 +1,392 @@
+# Fun with :io_lib.format
+
+## Fundamentals
+
+### Fun with *:io_lib.format*
+
+Available from the Erlang *io_lib* library, `:io_lib.format/2` is similar to string formatting functions from other languages. like printf or strfmt.
+
+There is also `:io.format/2` from the related *io* library with similar functionality, but returns {ok} on success. *io_lib* returns a charlist.
+
+Documentation is found in the Erlang stdlib documentation under the *io_lib* module. `iolib:format` and `iolib:fwrite` are (apparently) the same, full documentation is under `iolib:fwrite`.
+
+See also https://hexdocs.pm/elixir/erlang-libraries.html#formatted-text-output for Elixir documentation of formatted text output.
+
+### A brief overview of the function
+
+In Erlang, the function is `io_lib:format(Format, Data) -> chars()`
+
+In Elixir is looks like `:io_lib.format(String.t(), list) :: charlist`, where the String.t() is in the form of a format specifier.
+
+The specification of the format string is as below. Multiple formats in a string are allowed, and arbitrary strings can be mixed with valid formats.
+
+~F.P.PadModC  
+Where  
+~ = start of control sequence  
+F = field width  (positive is right justified, negative is left justfied)
+P = precision  (default is 6)
+Pad = padding character  (default is space)
+Mod = sequence modifier (t allows unicode, for example)  
+C = type (required)
+
+The `C` character determines the type and is required. All other components are optional, except the `~` which indicates the start of a format sequence.
+
+The value for `C` are c f e g s w p W P B X b x # + n i
+
+An example of a format specifier to break down:
+
+"~10.5.xts" where ~ is the format start, 10 is the field width, . indicates the next item is the precision, 5 is the precision, . indicates the next item is the padding, x is the separator, t is the modifier and s is the type (the only required element other than ~)
+
+A simpler example:
+
+"~.2f" where ~ is the start, . is the first indicator, meaning the precision is next, which is 2, and f is the specifier. There is no field width provided, so it defaults to 6.
+
+See below for many more examples.
+
+## Basic examples
+
+Simple example with no format specification.
+
+```elixir
+:io_lib.format("hello world", [])
+```
+
+Note that returns a charlist which can be easily converted to a string.
+
+```elixir
+:io_lib.format("hello world", []) |> to_string()
+```
+
+The simplest format specification, `~` which returns a literal "~".
+
+```elixir
+:io_lib.format("~~", []) |> to_string()
+```
+
+## Counts: c
+
+The `c` format, which is a character count.  
+Things to note are the '~' to start the format, the P or precision value of 5, the c specifier at the end of the format string and finally the data input. The input is a single number which is interpreted as a codepoint or ASCII value and can be in several forms: `?a`, `97`, `0x0061` (which are all equivalent).
+
+```elixir
+:io_lib.format("~5c", [?a]) |> to_string()
+```
+
+Another example with multiple formats and additional text. Note the arbitrary text mixed the format specifications, and the multiple formats referring to multiple items in the data list.
+
+```elixir
+:io_lib.format("Random stuff ~4c and then ~3c", [?a, ?b])
+```
+
+If you want a unicode character greater than ASCII 255, use the `t` modifer, otherwise the output may be unpredictable or an error.
+
+```elixir
+:io_lib.format("~5tc in unicode, but ~5c without", [0x1024, 0x1024]) |> to_string()
+```
+
+## Floats: f, e, g
+
+Here are some floating point examples. There are three formatters for floating points, e,f,g. f is basic float, e formats in scientific notation and g formats like f in a range  (0.1..10000) and like e outside of that range.  
+The default precision is 6 if you do not specify.
+
+In the second example below, the `.` marks the precision specifier.
+
+```elixir
+:io_lib.format("~f", [1.5])
+```
+
+```elixir
+:io_lib.format("~.2f", [1.5])
+```
+
+You can also use the F specifier to set the field width. The default behavior is to pad with spaces. In the second example below the padding character `#` is specified.  
+The field width, 10 in the first example and 6 in the second, is the full length of the output. The precision is the number of digits after the decimal.
+
+```elixir
+:io_lib.format("~10.2f", [1.5])
+```
+
+A negative field width specifier does left justification.
+
+```elixir
+:io_lib.format("~-10.2f", [1.5])
+```
+
+```elixir
+:io_lib.format("~6.3.#f", [0.01])
+```
+
+When using formats, be sure the the specified field with is long enough for the output.
+
+```elixir
+:io_lib.format("~6.3e", [0.01])
+```
+
+Oops! Add some room for the extra characters (or remove the width specifier).
+
+```elixir
+:io_lib.format("~7.3e", [0.01])
+```
+
+```elixir
+:io_lib.format("~.5e", [12.23])
+```
+
+Here's a way to look at the g class formatter. It generates numbers across a range of powers of 10 and applies the default `g` format with a precision of 6. Note that within the range 0.1..10000 it formats like `f` and outside of the range it formats like `e`.
+
+```elixir
+for n <- -3..5, do: :io_lib.format("~.g", [2.43 * :math.pow(10, n)]) |> to_string
+```
+
+## Using * in the format
+
+Quick refresher on format ~F.P.PadModC in the format string below:  
+F = 8  
+P = 6  
+Pad = .  
+Mod = t  
+C = s
+
+You can also specify the format string components in the data argument. If there is a `*` in the format, it will use the next data argument as input for F, P and Pad.
+
+<!-- livebook:{"break_markdown":true} -->
+
+Below F = 12, P = 8, Pad is default, and the value is 3.14159
+
+```elixir
+:io_lib.format("~*.*f", [12, 8, 3.14159])
+```
+
+Here is an example with a Pad defined.
+
+```elixir
+:io_lib.format("~*.*.*f", [10, 3, ?., 1.1])
+```
+
+Here's an example with a preview of the next section, starring the `s` specifier. Read on for more information.
+
+```elixir
+:io_lib.format("~*.*.*s", [10, 8, ?-, "banana"]) |> to_string()
+```
+
+## String: s
+
+The `s` specifier is a string specifier with truncation. The data input can be an iolist, a binary or an atom. The format string shown below has a field width of 4, a precision of 4 and two extra spaces at the end.
+
+```elixir
+:io_lib.format("|~4.4s  |", [[?a, ?b]]) |> to_string
+```
+
+```elixir
+# atom
+:io_lib.format("~s", [:a])
+```
+
+```elixir
+# one kind of iolist
+:io_lib.format("~s", [["dog", [99, 97, 116]]])
+```
+
+If we modify the data so it now has five chars as input, you can see the data fills the field to the field width but the characters are truncated to the precision value. The spaces at the end remain as part of the output.
+
+```elixir
+:io_lib.format("|~5.4s  |", [[?a, ?b, ?c, ?d, ?e]]) |> to_string
+```
+
+The padding character for the field width can be specified as well. The format specifies a leading bracket '[', a field width of 8, a precision of 4, a padding character of '-' and the `s` type specifier. The input is the binary "banana".
+
+```elixir
+:io_lib.format("[~8.4.-s]", ["banana"]) |> to_string()
+```
+
+## The t modifier again
+
+For unicode data, use the `t` modifier. Here the padding character is `.`. If you remove the `t` modifier, the results will be unpredictable or may generate an error.
+
+```elixir
+:io_lib.format("[~8.6..ts] or [~8.6..s]", ["snøplog", "snøplog"]) |> to_string()
+```
+
+Below the padding character is applied to the full field width to fill the precision of 6.
+
+```elixir
+:io_lib.format("[~8.6..ts]", ["バナナ"]) |> to_string()
+```
+
+Again, be sure to use the `t` modifier with unicode strings. You can clearly see in the output that the string formatted with the modifier have the correct unicode values (i.e. 12496, etc.) and those formatted without, do not, and are intepreted as individual bytes (227, 131, etc.).
+
+```elixir
+:io_lib.format("[~8.6..ts] vs. [~8.6..s] ", ["バナナ", "バナナ"])
+```
+
+The `s` formatter works on all sorts of objects, if they can be represented at a charlist. The Erlang function `:io_lib.write` takes any term and returns a charlist, which can be used as input. It might not represent Elixir structures as expected, unless you are familiar with how Erlang and Elixir represent terms.
+
+```elixir
+:io_lib.format("~10s", [:io_lib.write({:hey, :hey, :hey})]) |> to_string()
+```
+
+```elixir
+:io_lib.format("~s", [:io_lib.write(:what)]) |> to_string()
+```
+
+```elixir
+:io_lib.format("~s", [:io_lib.write(What)]) |> to_string()
+```
+
+```elixir
+:io_lib.format("~10s", [:io_lib.write(%{a: 1, b: 2, c: 3})]) |> to_string()
+```
+
+## Term structures: W, P, w, p
+
+This is where `:io_lib.format` has some additional functionality beyond string formatting. It can provide representation of Erlang (and Elixir) terms or types.
+
+<!-- livebook:{"break_markdown":true} -->
+
+The specifier `w` provides standard output of Erlang terms. Here is a binary.
+
+```elixir
+:io_lib.format("|~10w|", ["ab"]) |> to_string
+```
+
+```elixir
+:io_lib.format("|~10p|", ["ab"]) |> to_string
+```
+
+```elixir
+:io_lib.format("|~10w|", ["ab"]) |> to_string
+```
+
+Here is a list with the `W`specifier which requires the depth as a data argument. In this example, the maximum depth of the output is four.
+
+```elixir
+:io_lib.format("~W", [[1, 2, 3, 4, 5, 6, 7, 9], 4]) |> to_string
+```
+
+Here is an example of a nested list being displayed to a depth of 4, representing the unshown items as "...". Try changing the depth to see how the output changes.
+
+```elixir
+l = [1, [2, 3, [4, 5], 6, 7, [8, 9]], 10]
+:io_lib.format("~W", [l, 4]) |> to_string()
+```
+
+The `p` specifier works like `w`, but wraps the output for large structures. Compare the `w` output and the `p` output below. Note that the `w` output displays bitstrings with no linebreaks while the `p` output has escaped binaries, line padding and linebreaks for the specified width of 20.
+
+```elixir
+a = [
+  key: "value",
+  color: "blue",
+  address: "123 Main Street",
+  city: "Milwaukee",
+  country: "Republic of Mont Stanisbad"
+]
+
+:io_lib.format("~w", [a]) |> to_string()
+```
+
+```elixir
+:io_lib.format("~20p", [a]) |> to_string()
+```
+
+The `P` specifier is similar to `W` in that it displays to the specified depth, but also wraps line the `p` specifier.
+
+```elixir
+:io_lib.format("~20P", [a, 4]) |> to_string()
+```
+
+## The other modifiers: l, k, K
+
+The `l` modifier modifies the output of the P and p specifiers and `k` and `K` modify the output of the w, W, p and P specifiers.
+
+`l` prevents p from recognizing printable characters. 'k' and 'K' modify w, p, W, P to sort the output of map by keys (`k`) in `ordered` order, or by (`K`) custom order. Some examples follow.
+
+```elixir
+m = %{one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9}
+```
+
+`p` with the `l` modifier presents strings as raw binaries, like `w`.
+
+```elixir
+:io_lib.format("~20lp", [a]) |> to_string()
+```
+
+Note the alphabetical sort by key of map `m` created above, based on default of `k` modifier.
+
+```elixir
+:io_lib.format("~30kp", [m]) |> to_string()
+```
+
+The same using the `W`modifier with an output width of 4.
+
+```elixir
+:io_lib.format("~kW", [m, 4]) |> to_string()
+```
+
+`K` specifying `:reversed` order.
+
+```elixir
+:io_lib.format("~Kp", [:reversed, m]) |> to_string()
+```
+
+`K` specifying `:undefined` order.
+
+```elixir
+:io_lib.format("~Kp", [:undefined, m]) |> to_string()
+```
+
+## Integers: B, X, #, b, x, +
+
+The integer specifiers B, X, #, b, x, + take a formatter and an integer input and output the integer in the specified base. The lowercase versions are like the uppercase versions, but present letters in lower case, e.g. for hexidecimal numbers
+
+<!-- livebook:{"break_markdown":true} -->
+
+Default base is 10. Here is 10 in base 10.
+
+```elixir
+:io_lib.format("~B", [10]) |> to_string()
+```
+
+10 in base 2.
+
+```elixir
+:io_lib.format("~.2B", [10]) |> to_string()
+```
+
+Multiple examples in a single formatted string. Note the lowerbase `b` specifier and the lowercase letter in the base 27 representation of 100.
+
+```elixir
+:io_lib.format("~.16B, ~.8B, ~.22B, ~.27b", [100, 100, 100, 100])
+```
+
+The `X` specifier allows designation of a prefix before the number. Note the `x` version provides lowercase.
+
+```elixir
+:io_lib.format("~.16X, ~.8X, ~.22X, ~.27x", [100, ~c"0x", 100, ~c"0o", 100, ~c"22|", 100, ~c"27#"])
+```
+
+Finally, the `#` and `+` specifiers provide base plus the default sepearator of "#" between the base and the number.
+
+```elixir
+:io_lib.format("~.16#, ~.8#, ~.22#, ~.27+", [100, 100, 100, 100])
+```
+
+## Odds and ends
+
+The `n` specifier generates a linebreak or "\n" character.
+
+```elixir
+:io_lib.format("Hello~nthere", [])
+```
+
+The `i` specifier ignores the data at that position.
+
+```elixir
+:io_lib.format("~f ~f ~i ~f", [1.0, 2.0, 3.0, 4.0])
+```
+
+```elixir
+list = [1.0, 2.0, nil, 4.0]
+:io_lib.format("~e ~f ~i ~g", list)
+```
+
+Those are the basics of the fun and powerful :io_lib.format function. It has the capabilities of printf or strfmt plus some added goodies.
