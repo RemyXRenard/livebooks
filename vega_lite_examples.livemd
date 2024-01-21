@@ -1,0 +1,1148 @@
+# VegaLite examples
+
+```elixir
+Mix.install([
+  {:kino_vega_lite, "~> 0.1.7"},
+  {:jason, "~> 1.4"}
+])
+```
+
+## Bar Charts
+
+Kino.VegaLite examples taken from vega.github.io. Currently only bar chart examples. This is on an older version ofr Kino.VegaLite (0.1.7)
+
+```elixir
+alias VegaLite, as: Vl
+url = "https://vega.github.io/editor/"
+```
+
+Simple Bar Chart
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A simple bar chart with embedded data.",
+  "data": {
+    "values": [
+      {"a": "A", "b": 28}, {"a": "B", "b": 55}, {"a": "C", "b": 43},
+      {"a": "D", "b": 91}, {"a": "E", "b": 81}, {"a": "F", "b": 53},
+      {"a": "G", "b": 19}, {"a": "H", "b": 87}, {"a": "I", "b": 52}
+    ]
+  },
+  "mark": "bar",
+  "encoding": {
+    "x": {"field": "a", "type": "nominal", "axis": {"labelAngle": 0}},
+    "y": {"field": "b", "type": "quantitative"}
+  }
+}
+"""
+
+# Reproduce in Elixir
+
+data = [
+  %{"a" => "A", "b" => 28},
+  %{"a" => "B", "b" => 55},
+  %{"a" => "C", "b" => 43},
+  %{"a" => "D", "b" => 91},
+  %{"a" => "E", "b" => 81},
+  %{"a" => "F", "b" => 53},
+  %{"a" => "G", "b" => 19},
+  %{"a" => "H", "b" => 87},
+  %{"a" => "I", "b" => 52}
+]
+
+Vl.new()
+|> Vl.data_from_values(data)
+|> Vl.mark(:bar)
+|> Vl.encode(:x, field: "a", type: :nominal, axis: [label_angle: 0])
+|> Vl.encode(:y, field: "b", type: :quantitative)
+
+# |> Jason.Formatter.minimize()
+```
+
+### Responsive Bar Chart
+
+The "container" specification for width doesn't seem to work. Assuming it has to do with the code cell output. The generated spec seems okay, and it works with a fixed width (e.g. 250)
+
+```elixir
+spec =
+  """
+  {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "width": "container",
+    "height": 250,
+    "data": {"url": "https://vega.github.io/editor/data/cars.json"},
+    "mark": "bar",
+    "encoding": {
+      "x": {"field": "Origin"},
+      "y": {"aggregate": "count", "title": "Number of Cars"}
+    }
+  }
+  """
+
+Vl.new(width: 250, height: 250)
+|> Vl.data_from_url("https://vega.github.io/editor/data/cars.json")
+|> Vl.mark(:bar)
+|> Vl.encode(:x, field: "Origin")
+|> Vl.encode(:y, field: "Origin", aggregate: "count", title: "Number of Cars")
+```
+
+### Aggregate bar chart
+
+Note that the "description" encoding is for ARIA accessibility and will only affect SVG output.
+
+```elixir
+spec =
+  """
+  {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "description": "A bar chart showing the US population distribution of age groups in 2000.",
+    "height": {"step": 17},
+    "data": { "url": "https://vega.github.io/editor/data/population.json"},
+    "transform": [{"filter": "datum.year == 2000"}],
+    "mark": "bar",
+    "encoding": {
+      "y": {"field": "age"},
+      "x": {
+        "aggregate": "sum", "field": "people",
+        "title": "population"
+      }
+    }
+  }
+  """
+
+# Vl.from_json(spec)
+
+Vl.new(
+  height: [step: 17],
+  description: "A bar chart showing the US population distribution of age groups in 2000."
+)
+|> Vl.data_from_url("https://vega.github.io/editor/data/population.json")
+|> Vl.transform(filter: "datum.year == 2000")
+|> Vl.mark(:bar)
+|> Vl.encode(:y, field: "age")
+|> Vl.encode(:x, field: "people", aggregate: "sum", title: "population")
+```
+
+### Aggregate bar chart (sorted)
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A bar chart that sorts the y-values by the x-values.",
+  "data": {"url": "https://vega.github.io/editor/data/population.json"},
+  "transform": [{"filter": "datum.year == 2000"}],
+  "height": {"step": 17},
+  "mark": "bar",
+  "encoding": {
+    "y": {
+      "field": "age",
+      "type": "ordinal",
+      "sort": "-x"
+    },
+    "x": {
+      "aggregate": "sum",
+      "field": "people",
+      "title": "population"
+    }
+  }
+}
+"""
+
+Vl.new(
+  height: [step: 17],
+  description: "A bar chart showing the US population distribution of age groups in 2000."
+)
+|> Vl.data_from_url("https://vega.github.io/editor/data/population.json")
+|> Vl.transform(filter: "datum.year == 2000")
+|> Vl.mark(:bar)
+|> Vl.encode(:y, field: "age", type: :ordinal, sort: "-x")
+|> Vl.encode(:x, field: "people", aggregate: "sum", title: "population")
+```
+
+### Grouped bar chart
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {
+    "values": [
+      {"category":"A", "group": "x", "value":0.1},
+      {"category":"A", "group": "y", "value":0.6},
+      {"category":"A", "group": "z", "value":0.9},
+      {"category":"B", "group": "x", "value":0.7},
+      {"category":"B", "group": "y", "value":0.2},
+      {"category":"B", "group": "z", "value":1.1},
+      {"category":"C", "group": "x", "value":0.6},
+      {"category":"C", "group": "y", "value":0.1},
+      {"category":"C", "group": "z", "value":0.2}
+    ]
+  },
+  "mark": "bar",
+  "encoding": {
+    "x": {"field": "category"},
+    "y": {"field": "value", "type": "quantitative"},
+    "xOffset": {"field": "group"},
+    "color": {"field": "group"}
+  }
+}
+"""
+
+data = [
+  %{"category" => "A", "group" => "x", "value" => 0.1},
+  %{"category" => "A", "group" => "y", "value" => 0.6},
+  %{"category" => "A", "group" => "z", "value" => 0.9},
+  %{"category" => "B", "group" => "x", "value" => 0.7},
+  %{"category" => "B", "group" => "y", "value" => 0.2},
+  %{"category" => "B", "group" => "z", "value" => 1.1},
+  %{"category" => "C", "group" => "x", "value" => 0.6},
+  %{"category" => "C", "group" => "y", "value" => 0.1},
+  %{"category" => "C", "group" => "z", "value" => 0.2}
+]
+
+Vl.new()
+|> Vl.data_from_values(data)
+|> Vl.mark(:bar)
+|> Vl.encode(:x, field: "category")
+|> Vl.encode(:y, field: "value", type: :quantitative)
+|> Vl.encode(:x_offset, field: "group")
+|> Vl.encode(:color, field: "group")
+```
+
+### Grouped Bar Chart (Multiple Measure with Repeat)
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {
+    "url": "https://vega.github.io/editor/data/movies.json"
+  },
+  "repeat": {"layer": ["Worldwide Gross", "US Gross"]},
+  "spec": {
+    "mark": "bar",
+    "encoding": {
+      "x": {
+        "field": "Major Genre",
+        "type": "nominal"
+      },
+      "y": {
+        "aggregate": "sum",
+        "field": {"repeat": "layer"},
+        "type": "quantitative",
+        "title": "Total Gross"
+      },
+      "color": {"datum": {"repeat": "layer"}, "title": "Gross"},
+      "xOffset": {"datum": {"repeat": "layer"}}
+    }
+  },
+  "config": {
+    "mark": {"invalid": null}
+  }
+}
+"""
+
+# Vl.from_json(spec)
+Vl.new()
+|> Vl.config(mark: [invalid: nil])
+|> Vl.data_from_url(url <> "data/movies.json")
+|> Vl.repeat(
+  [layer: ["Worldwide Gross", "US Gross"]],
+  Vl.new()
+  |> Vl.encode(:x, field: "Major Genre", type: :nominal)
+  |> Vl.encode(:y,
+    field: [repeat: "layer"],
+    type: :quantitative,
+    aggregate: "sum",
+    total: "Gross"
+  )
+  |> Vl.encode(:color, datum: [repeat: "layer"])
+  |> Vl.encode(:x_offset, datum: [repeat: "layer"])
+  |> Vl.mark(:bar)
+)
+```
+
+### Stacked Bar Chart
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {"url": "https://vega.github.io/editor/data/seattle-weather.csv"},
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "timeUnit": "month",
+      "field": "date",
+      "type": "ordinal",
+      "title": "Month of the year"
+    },
+    "y": {
+      "aggregate": "count",
+      "type": "quantitative"
+    },
+    "color": {
+      "field": "weather",
+      "type": "nominal",
+      "scale": {
+        "domain": ["sun", "fog", "drizzle", "rain", "snow"],
+        "range": ["#e7ba52", "#c7c7c7", "#aec7e8", "#1f77b4", "#9467bd"]
+      },
+      "title": "Weather type"
+    }
+  }
+}
+"""
+
+Vl.new(title: "Weather Type")
+|> Vl.data_from_url(url <> "data/seattle-weather.csv")
+|> Vl.mark(:bar)
+|> Vl.encode(:x, time_unit: :month, field: "date", type: :ordinal, title: "Month of the year")
+|> Vl.encode(:y, aggregate: :count, type: :quantitative)
+|> Vl.encode(:color,
+  field: "weather",
+  type: :nominal,
+  scale: [
+    domain: ["sun", "fog", "drizzle", "rain", "snow"],
+    range: ["#e7ba52", "#c7c7c7", "#aec7e8", "#1f77b4", "#9467bd"]
+  ]
+)
+```
+
+### Stacked Bar Chart with Rounded Corners
+
+Almost identical to above, with defaults for colors, legends and titles. Added stying to the bars.
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {"url": "data/seattle-weather.csv"},
+  "mark": {"type": "bar", "cornerRadiusTopLeft": 3, "cornerRadiusTopRight": 3},
+  "encoding": {
+    "x": {"timeUnit": "month", "field": "date", "type": "ordinal"},
+    "y": {"aggregate": "count"},
+    "color": {"field": "weather"}
+  }
+}
+"""
+
+Vl.new()
+|> Vl.data_from_url(url <> "data/seattle-weather.csv")
+|> Vl.mark(:bar, corner_radius_top_left: 3, corner_radius_top_right: 3)
+|> Vl.encode(:x, time_unit: :month, field: "date", type: :ordinal)
+|> Vl.encode(:y, aggregate: :count)
+|> Vl.encode(:color, field: "weather")
+```
+
+### Horizontal Stacked Bar Chart
+
+The colors are not identical to the VegaLite example
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {"url": "data/barley.json"},
+  "mark": "bar",
+  "encoding": {
+    "x": {"aggregate": "sum", "field": "yield"},
+    "y": {"field": "variety"},
+    "color": {"field": "site"}
+  }
+}
+"""
+
+Vl.new()
+|> Vl.data_from_url(url <> "data/barley.json")
+|> Vl.mark(:bar, corner_radius_bottom_right: 3, corner_radius_top_right: 3)
+|> Vl.encode(:x, aggregate: "sum", field: "yield")
+|> Vl.encode(:y, field: "variety")
+|> Vl.encode(:color, field: "site")
+```
+
+### Normalized (Percentage) Stacked Bar Chart
+
+The transform operations are separated. It's unclear if there is a way to express them in a single transform/2.
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": { "url": "data/population.json"},
+  "transform": [
+    {"filter": "datum.year == 2000"},
+    {"calculate": "datum.sex == 2 ? 'Female' : 'Male'", "as": "gender"}
+  ],
+  "mark": "bar",
+  "width": {"step": 17},
+  "encoding": {
+    "y": {
+      "aggregate": "sum", "field": "people",
+      "title": "population",
+      "stack":  "normalize"
+    },
+    "x": {"field": "age"},
+    "color": {
+      "field": "gender",
+      "scale": {"range": ["#675193", "#ca8861"]}
+    }
+  }
+}
+"""
+
+Vl.new(width: [step: 17])
+|> Vl.data_from_url(url <> "data/population.json")
+|> Vl.transform(filter: "datum.year == 2000")
+|> Vl.transform(calculate: "datum.sex == 2 ? 'Female' : 'Male'", as: "gender")
+|> Vl.mark(:bar)
+|> Vl.encode(:x, field: "age")
+|> Vl.encode(:y, aggregate: "sum", field: "people", title: "population", stack: "normalize")
+|> Vl.encode(:color, field: "gender", scale: [range: ["#675193", "#ca8861"]])
+```
+
+### Normalized (Percentage) Stacked Bar Chart With Labels
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": { "url": "data/population.json"},
+  "transform": [
+    {"filter": "datum.year == 2000"},
+    {"calculate": "datum.sex == 2 ? 'Female' : 'Male'", "as": "gender"}
+  ],
+  "height": {"step": 17},
+  "encoding": {
+    "y": {"field": "age"}
+  },
+  "layer": [{
+    "mark": "bar",
+    "encoding": {
+      "x": {
+        "aggregate": "sum", "field": "people",
+        "title": "population",
+        "stack":  "normalize"
+      },
+      "color": {
+        "field": "gender",
+        "scale": {"range": ["#675193", "#ca8861"]}
+      }
+    }
+  }, {
+    "mark": {"type": "text", "opacity": 0.9, "color": "white"},
+    "encoding": {
+      "x": {
+        "aggregate": "sum", "field": "people",
+        "title": "population",
+        "stack":  "normalize",
+        "bandPosition": 0.5
+      },
+      "text": {
+        "aggregate": "sum", "field": "people",
+        "title": "population"
+      },
+      "detail": {
+        "field": "gender"
+      }
+    }
+  }]
+}
+"""
+
+Vl.new(height: [step: 17])
+|> Vl.data_from_url(url <> "data/population.json")
+|> Vl.transform(filter: "datum.year == 2000")
+|> Vl.transform(calculate: "datum.sex == 2 ? 'Female' : 'Male'", as: "gender")
+|> Vl.encode(:y, field: "age")
+|> Vl.layers([
+  Vl.new()
+  |> Vl.mark(:bar)
+  |> Vl.encode(:x, aggregate: "sum", field: "people", title: "population", stack: "normalize")
+  |> Vl.encode(:color, field: "gender", scale: [range: ["#675193", "#ca8861"]]),
+  Vl.new()
+  |> Vl.mark(:text, opacity: 0.9, color: "white")
+  |> Vl.encode(:x,
+    aggregate: "sum",
+    field: "people",
+    title: "population",
+    stack: "normalize",
+    band_position: 0.5
+  )
+  |> Vl.encode(:text, aggregate: "sum", field: "people", title: "population")
+  |> Vl.encode(:detail, field: "gender")
+])
+```
+
+### Gantt Chart (Ranged Bar Marks)
+
+x2 is the secondary x channel that specifies the range of the bar.
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A simple bar chart with ranged data (aka Gantt Chart).",
+  "data": {
+    "values": [
+      {"task": "A", "start": 1, "end": 3},
+      {"task": "B", "start": 3, "end": 8},
+      {"task": "C", "start": 8, "end": 10}
+    ]
+  },
+  "mark": "bar",
+  "encoding": {
+    "y": {"field": "task", "type": "ordinal"},
+    "x": {"field": "start", "type": "quantitative"},
+    "x2": {"field": "end"}
+  }
+}
+"""
+
+Vl.new()
+|> Vl.data_from_values([
+  %{"end" => 3, "start" => 1, "task" => "A"},
+  %{"end" => 8, "start" => 3, "task" => "B"},
+  %{"end" => 10, "start" => 8, "task" => "C"}
+])
+|> Vl.mark(:bar)
+|> Vl.encode(:x, field: "start", type: :quantitative)
+|> Vl.encode(:y, field: "task", type: :ordinal)
+|> Vl.encode(:x2, field: "end")
+```
+
+### A Bar Chart Encoding Color Names in the Data
+
+Note the use of ***nil*** in the color encoding. This generates the null object in the output (not a string)
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A bar chart that directly encodes color names in the data.",
+  "data": {
+    "values": [
+      {
+        "color": "red",
+        "b": 28
+      },
+      {
+        "color": "green",
+        "b": 55
+      },
+      {
+        "color": "blue",
+        "b": 43
+      }
+    ]
+  },
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "field": "color",
+      "type": "nominal"
+    },
+    "y": {
+      "field": "b",
+      "type": "quantitative"
+    },
+    "color": {
+      "field": "color",
+      "type": "nominal",
+      "scale": null
+    }
+  }
+}
+"""
+
+Vl.new(description: "A bar chart that directly encodes color names in the data.")
+|> Vl.data_from_values([
+  %{color: "red", b: 28},
+  %{color: "green", b: 55},
+  %{color: "blue", b: 43}
+])
+|> Vl.mark(:bar)
+|> Vl.encode(:x, field: "color", type: :nominal)
+|> Vl.encode(:y, field: "b", type: :quantitative)
+|> Vl.encode(:color, field: "color", type: :nominal, scale: nil)
+```
+
+### Layered Bar Chart
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A bar chart showing the US population distribution of age groups and gender in 2000.",
+  "data": { "url": "data/population.json"},
+  "transform": [
+    {"filter": "datum.year == 2000"},
+    {"calculate": "datum.sex == 2 ? 'Female' : 'Male'", "as": "gender"}
+  ],
+  "width": {"step": 17},
+  "mark": "bar",
+  "encoding": {
+    "x": {"field": "age", "type": "ordinal"},
+    "y": {
+      "aggregate": "sum", "field": "people",
+      "title": "population",
+      "stack": null
+    },
+    "color": {
+      "field": "gender",
+      "scale": {"range": ["#675193", "#ca8861"]}
+    },
+    "opacity": {"value": 0.7}
+  }
+}
+"""
+
+Vl.new(width: [step: 17])
+|> Vl.data_from_url(url <> "data/population.json")
+|> Vl.transform(filter: "datum.year == 2000")
+|> Vl.transform(calculate: "datum.sex == 2 ? 'Female' : 'Male'", as: "gender")
+|> Vl.mark(:bar)
+|> Vl.encode(:opacity, value: 0.7)
+|> Vl.encode(:x, field: "age", type: :ordinal)
+|> Vl.encode(:y, aggregate: "sum", field: "people", title: "population", stack: nil)
+|> Vl.encode(:color, field: "gender", scale: [randge: ["#675193", "#ca8861"]])
+```
+
+### Diverging Stacked Bar Chart (Population Pyramid)
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A population pyramid for the US in 2000, created using stack. See https://vega.github.io/vega-lite/examples/concat_population_pyramid.html for a variant of this created using concat.",
+  "data": { "url": "https://vega.github.io/editor/data/population.json"},
+  "transform": [
+    {"filter": "datum.year == 2000"},
+    {"calculate": "datum.sex == 2 ? 'Female' : 'Male'", "as": "gender"},
+    {"calculate": "datum.sex == 2 ? -datum.people : datum.people", "as": "signed_people"}
+  ],
+  "width": 300,
+  "height": 200,
+  "mark": "bar",
+  "encoding": {
+    "y": {
+      "field": "age",
+      "axis": null, "sort": "descending"
+    },
+    "x": {
+      "aggregate": "sum", "field": "signed_people",
+      "title": "population",
+      "axis": {"format": "s"}
+    },
+    "color": {
+      "field": "gender",
+      "scale": {"range": ["#675193", "#ca8861"]},
+      "legend": {"orient": "top", "title": null}
+    }
+  },
+  "config": {
+    "view": {"stroke": null},
+    "axis": {"grid": false}
+  }
+}
+"""
+
+Vl.new(width: 300, height: 200, description: "A population pyramid for the US in 2000, ")
+|> Vl.data_from_url(url <> "data/population.json")
+|> Vl.config(view: [stroke: nil], axis: [grid: false])
+|> Vl.transform(filter: "datum.year == 2000")
+|> Vl.transform(calculate: "datum.sex == 2 ? 'Female' : 'Male'", as: "gender")
+|> Vl.transform(calculate: "datum.sex == 2 ? -datum.people : datum.people", as: "signed_people")
+|> Vl.mark(:bar)
+|> Vl.encode(:x,
+  aggregate: "sum",
+  field: "signed_people",
+  title: "population",
+  axis: [format: "s"]
+)
+|> Vl.encode(:y, field: "age", axis: nil, sort: "descending")
+|> Vl.encode(:color,
+  field: "gender",
+  scale: [range: ["#675193", "#ca8861"]],
+  legend: [orient: :top, title: nil]
+)
+```
+
+### Diverging Stacked Bar Chart (with Neutral Parts)
+
+Note the double brackets [[ ]] around the joinaggregate parameters. It's unclear if there is another way to express this.
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A diverging stacked bar chart for sentiments towards a set of eight questions, displayed as percentages with neutral responses straddling the 0% mark",
+  "data": {
+    "values": [
+      {"question": "Question 1", "type": "Strongly disagree", "value": 24, "percentage": 0.7},
+      {"question": "Question 1", "type": "Disagree", "value": 294, "percentage": 9.1},
+      {"question": "Question 1", "type": "Neither agree nor disagree", "value": 594, "percentage": 18.5},
+      {"question": "Question 1", "type": "Agree", "value": 1927, "percentage": 59.9},
+      {"question": "Question 1", "type": "Strongly agree", "value": 376, "percentage": 11.7},
+      {"question": "Question 2", "type": "Strongly disagree", "value": 2, "percentage": 18.2},
+      {"question": "Question 2", "type": "Disagree", "value": 2, "percentage": 18.2},
+      {"question": "Question 2", "type": "Neither agree nor disagree", "value": 0, "percentage": 0},
+      {"question": "Question 2", "type": "Agree", "value": 7, "percentage": 63.6},
+      {"question": "Question 2", "type": "Strongly agree", "value": 11, "percentage": 0},
+      {"question": "Question 3", "type": "Strongly disagree", "value": 2, "percentage": 20},
+      {"question": "Question 3", "type": "Disagree", "value": 0, "percentage": 0},
+      {"question": "Question 3", "type": "Neither agree nor disagree", "value": 2, "percentage": 20},
+      {"question": "Question 3", "type": "Agree", "value": 4, "percentage": 40},
+      {"question": "Question 3", "type": "Strongly agree", "value": 2, "percentage": 20},
+      {"question": "Question 4", "type": "Strongly disagree", "value": 0, "percentage": 0},
+      {"question": "Question 4", "type": "Disagree", "value": 2, "percentage": 12.5},
+      {"question": "Question 4", "type": "Neither agree nor disagree", "value": 1, "percentage": 6.3},
+      {"question": "Question 4", "type": "Agree", "value": 7, "percentage": 43.8},
+      {"question": "Question 4", "type": "Strongly agree", "value": 6, "percentage": 37.5},
+      {"question": "Question 5", "type": "Strongly disagree", "value": 0, "percentage": 0},
+      {"question": "Question 5", "type": "Disagree", "value": 1, "percentage": 4.2},
+      {"question": "Question 5", "type": "Neither agree nor disagree", "value": 3, "percentage": 12.5},
+      {"question": "Question 5", "type": "Agree", "value": 16, "percentage": 66.7},
+      {"question": "Question 5", "type": "Strongly agree", "value": 4, "percentage": 16.7},
+      {"question": "Question 6", "type": "Strongly disagree", "value": 1, "percentage": 6.3},
+      {"question": "Question 6", "type": "Disagree", "value": 1, "percentage": 6.3},
+      {"question": "Question 6", "type": "Neither agree nor disagree", "value": 2, "percentage": 12.5},
+      {"question": "Question 6", "type": "Agree", "value": 9, "percentage": 56.3},
+      {"question": "Question 6", "type": "Strongly agree", "value": 3, "percentage": 18.8},
+      {"question": "Question 7", "type": "Strongly disagree", "value": 0, "percentage": 0},
+      {"question": "Question 7", "type": "Disagree", "value": 0, "percentage": 0},
+      {"question": "Question 7", "type": "Neither agree nor disagree", "value": 1, "percentage": 20},
+      {"question": "Question 7", "type": "Agree", "value": 4, "percentage": 80},
+      {"question": "Question 7", "type": "Strongly agree", "value": 0, "percentage": 0},
+      {"question": "Question 8", "type": "Strongly disagree", "value": 0, "percentage": 0},
+      {"question": "Question 8", "type": "Disagree", "value": 0, "percentage": 0},
+      {"question": "Question 8", "type": "Neither agree nor disagree", "value": 0, "percentage": 0},
+      {"question": "Question 8", "type": "Agree", "value": 0, "percentage": 0},
+      {"question": "Question 8", "type": "Strongly agree", "value": 2, "percentage": 100}
+    ]
+  },
+  "transform": [
+    {
+      "calculate": "if(datum.type === 'Strongly disagree',-2,0) + if(datum.type==='Disagree',-1,0) + if(datum.type =='Neither agree nor disagree',0,0) + if(datum.type ==='Agree',1,0) + if(datum.type ==='Strongly agree',2,0)",
+      "as": "q_order"
+    },
+    {
+      "calculate": "if(datum.type === 'Disagree' || datum.type === 'Strongly disagree', datum.percentage,0) + if(datum.type === 'Neither agree nor disagree', datum.percentage / 2,0)",
+      "as": "signed_percentage"
+    },
+    {"stack": "percentage", "as": ["v1", "v2"], "groupby": ["question"]},
+    {
+      "joinaggregate": [
+        {
+          "field": "signed_percentage",
+          "op": "sum",
+          "as": "offset"
+        }
+      ],
+      "groupby": ["question"]
+    },
+    {"calculate": "datum.v1 - datum.offset", "as": "nx"},
+    {"calculate": "datum.v2 - datum.offset", "as": "nx2"}
+  ],
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "field": "nx",
+      "type": "quantitative",
+      "title": "Percentage"
+    },
+    "x2": {"field": "nx2"},
+    "y": {
+      "field": "question",
+      "type": "nominal",
+      "title": "Question",
+      "axis": {
+        "offset": 5,
+        "ticks": false,
+        "minExtent": 60,
+        "domain": false
+      }
+    },
+    "color": {
+      "field": "type",
+      "type": "nominal",
+      "title": "Response",
+      "scale": {
+        "domain": ["Strongly disagree", "Disagree", "Neither agree nor disagree", "Agree", "Strongly agree"],
+        "range": ["#c30d24", "#f3a583", "#cccccc", "#94c6da", "#1770ab"],
+        "type": "ordinal"
+      }
+    }
+  }
+}
+"""
+
+Vl.new()
+|> Vl.data_from_values([
+  %{
+    "percentage" => 0.7,
+    "question" => "Question 1",
+    "type" => "Strongly disagree",
+    "value" => 24
+  },
+  %{"percentage" => 9.1, "question" => "Question 1", "type" => "Disagree", "value" => 294},
+  %{
+    "percentage" => 18.5,
+    "question" => "Question 1",
+    "type" => "Neither agree nor disagree",
+    "value" => 594
+  },
+  %{"percentage" => 59.9, "question" => "Question 1", "type" => "Agree", "value" => 1927},
+  %{"percentage" => 11.7, "question" => "Question 1", "type" => "Strongly agree", "value" => 376},
+  %{
+    "percentage" => 18.2,
+    "question" => "Question 2",
+    "type" => "Strongly disagree",
+    "value" => 2
+  },
+  %{"percentage" => 18.2, "question" => "Question 2", "type" => "Disagree", "value" => 2},
+  %{
+    "percentage" => 0,
+    "question" => "Question 2",
+    "type" => "Neither agree nor disagree",
+    "value" => 0
+  },
+  %{"percentage" => 63.6, "question" => "Question 2", "type" => "Agree", "value" => 7},
+  %{"percentage" => 0, "question" => "Question 2", "type" => "Strongly agree", "value" => 11},
+  %{"percentage" => 20, "question" => "Question 3", "type" => "Strongly disagree", "value" => 2},
+  %{"percentage" => 0, "question" => "Question 3", "type" => "Disagree", "value" => 0},
+  %{
+    "percentage" => 20,
+    "question" => "Question 3",
+    "type" => "Neither agree nor disagree",
+    "value" => 2
+  },
+  %{"percentage" => 40, "question" => "Question 3", "type" => "Agree", "value" => 4},
+  %{"percentage" => 20, "question" => "Question 3", "type" => "Strongly agree", "value" => 2},
+  %{"percentage" => 0, "question" => "Question 4", "type" => "Strongly disagree", "value" => 0},
+  %{"percentage" => 12.5, "question" => "Question 4", "type" => "Disagree", "value" => 2},
+  %{
+    "percentage" => 6.3,
+    "question" => "Question 4",
+    "type" => "Neither agree nor disagree",
+    "value" => 1
+  },
+  %{"percentage" => 43.8, "question" => "Question 4", "type" => "Agree", "value" => 7},
+  %{"percentage" => 37.5, "question" => "Question 4", "type" => "Strongly agree", "value" => 6},
+  %{"percentage" => 0, "question" => "Question 5", "type" => "Strongly disagree", "value" => 0},
+  %{"percentage" => 4.2, "question" => "Question 5", "type" => "Disagree", "value" => 1},
+  %{
+    "percentage" => 12.5,
+    "question" => "Question 5",
+    "type" => "Neither agree nor disagree",
+    "value" => 3
+  },
+  %{"percentage" => 66.7, "question" => "Question 5", "type" => "Agree", "value" => 16},
+  %{"percentage" => 16.7, "question" => "Question 5", "type" => "Strongly agree", "value" => 4},
+  %{"percentage" => 6.3, "question" => "Question 6", "type" => "Strongly disagree", "value" => 1},
+  %{"percentage" => 6.3, "question" => "Question 6", "type" => "Disagree", "value" => 1},
+  %{
+    "percentage" => 12.5,
+    "question" => "Question 6",
+    "type" => "Neither agree nor disagree",
+    "value" => 2
+  },
+  %{"percentage" => 56.3, "question" => "Question 6", "type" => "Agree", "value" => 9},
+  %{"percentage" => 18.8, "question" => "Question 6", "type" => "Strongly agree", "value" => 3},
+  %{"percentage" => 0, "question" => "Question 7", "type" => "Strongly disagree", "value" => 0},
+  %{"percentage" => 0, "question" => "Question 7", "type" => "Disagree", "value" => 0},
+  %{
+    "percentage" => 20,
+    "question" => "Question 7",
+    "type" => "Neither agree nor disagree",
+    "value" => 1
+  },
+  %{"percentage" => 80, "question" => "Question 7", "type" => "Agree", "value" => 4},
+  %{"percentage" => 0, "question" => "Question 7", "type" => "Strongly agree", "value" => 0},
+  %{"percentage" => 0, "question" => "Question 8", "type" => "Strongly disagree", "value" => 0},
+  %{"percentage" => 0, "question" => "Question 8", "type" => "Disagree", "value" => 0},
+  %{
+    "percentage" => 0,
+    "question" => "Question 8",
+    "type" => "Neither agree nor disagree",
+    "value" => 0
+  },
+  %{"percentage" => 0, "question" => "Question 8", "type" => "Agree", "value" => 0},
+  %{"percentage" => 100, "question" => "Question 8", "type" => "Strongly agree", "value" => 2}
+])
+|> Vl.transform(
+  as: "q_order",
+  calculate:
+    "if(datum.type === 'Strongly disagree',-2,0) + if(datum.type==='Disagree',-1,0) + if(datum.type =='Neither agree nor disagree',0,0) + if(datum.type ==='Agree',1,0) + if(datum.type ==='Strongly agree',2,0)"
+)
+|> Vl.transform(
+  as: "signed_percentage",
+  calculate:
+    "if(datum.type === 'Disagree' || datum.type === 'Strongly disagree', datum.percentage,0) + if(datum.type === 'Neither agree nor disagree', datum.percentage / 2,0)"
+)
+|> Vl.transform(stack: "percentage", as: ["v1", "v2"], groupby: ["question"])
+|> Vl.transform(
+  joinaggregate: [[field: "signed_percentage", op: "sum", as: "offset"]],
+  groupby: ["question"]
+)
+|> Vl.transform(calculate: "datum.v1 - datum.offset", as: "nx")
+|> Vl.transform(calculate: "datum.v2 - datum.offset", as: "nx2")
+|> Vl.mark(:bar)
+|> Vl.encode(:x, field: "nx", type: :quantitative, title: "Percentage")
+|> Vl.encode(:x2, field: "nx2")
+|> Vl.encode(:y,
+  field: "question",
+  type: :nominal,
+  title: "Question",
+  axis: [offset: 5, ticks: false, min_extent: 60, domain: false]
+)
+|> Vl.encode(:color,
+  field: "type",
+  title: "Response",
+  type: :nominal,
+  scale: [
+    domain: [
+      "Strongly disagree",
+      "Disagree",
+      "Neither agree nor disagree",
+      "Agree",
+      "Strongly agree"
+    ],
+    range: ["#c30d24", "#f3a583", "#cccccc", "#94c6da", "#1770ab"],
+    type: :ordinal
+  ]
+)
+```
+
+### Simple Bar Chart with Labels
+
+Same data, same x: and y: encoding, expressed in two ways (bar and text)
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "Bar chart with text labels. Set domain to make the frame cover the labels.",
+  "data": {
+    "values": [
+      {"a": "A", "b": 28},
+      {"a": "B", "b": 55},
+      {"a": "C", "b": 43}
+    ]
+  },
+  "encoding": {
+    "y": {"field": "a", "type": "nominal"},
+    "x": {"field": "b", "type": "quantitative", "scale": {"domain": [0, 60]}}
+  },
+  "layer": [{
+    "mark": "bar"
+  }, {
+    "mark": {
+      "type": "text",
+      "align": "left",
+      "baseline": "middle",
+      "dx": 3
+    },
+    "encoding": {
+      "text": {"field": "b", "type": "quantitative"}
+    }
+  }]
+}
+"""
+
+Vl.new(descrption: "Bar chart with text labels. Set domain to make the frame cover the labels.")
+|> Vl.data_from_values([
+  %{"a" => "A", "b" => 28},
+  %{"a" => "B", "b" => 55},
+  %{"a" => "C", "b" => 43}
+])
+|> Vl.encode(:y, field: "a", type: :nominal)
+|> Vl.encode(:x, field: "b", type: :quantitative, scale: [domain: [0, 60]])
+|> Vl.layers([
+  Vl.new()
+  |> Vl.mark(:bar),
+  Vl.new()
+  |> Vl.mark(:text, align: "left", baseline: "middle", dx: 3)
+  |> Vl.encode(:text, field: "b", type: :quantitative)
+])
+```
+
+### Bar Chart with Label Overlays
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": 200,
+  "height": {"step": 16},
+  "data": {"url": "data/movies.json"},
+  "encoding": {
+    "y": {
+      "field": "Major Genre",
+      "type": "nominal",
+      "axis": null
+    }
+  },
+  "layer": [{
+    "mark": {"type": "bar", "color": "#ddd"},
+    "encoding": {
+      "x": {
+        "aggregate": "mean",
+        "field": "IMDB Rating",
+        "scale": {"domain": [0, 10]},
+        "title": "Mean IMDB Ratings"
+      }
+    }
+  }, {
+    "mark": {"type": "text", "align": "left", "x": 5},
+    "encoding": {
+      "text": {"field": "Major Genre"},
+      "detail": {"aggregate": "count"}
+    }
+  }]
+}
+"""
+
+Vl.new(width: 200, height: [step: 16])
+|> Vl.data_from_url(url <> "data/movies.json")
+|> Vl.encode(:y, field: "Major Genre", type: :nominal, axis: nil)
+|> Vl.layers([
+  Vl.new()
+  |> Vl.mark(:bar, color: "#ddd")
+  |> Vl.encode(:x,
+    aggregate: "mean",
+    field: "IMDB Rating",
+    scale: [domain: [0, 10]],
+    title: "Mean IMDB Rating"
+  ),
+  Vl.new()
+  |> Vl.mark(:text, align: "left", x: 5)
+  |> Vl.encode(:text, field: "Major Genre", detail: [aggregate: "count"])
+])
+```
+
+### Bar Chart showing Initials of Month Names
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "Using `labelExpr` to show only initial letters of month names.",
+  "data": {"url": "data/seattle-weather.csv"},
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "timeUnit": "month",
+      "field": "date",
+      "axis": {
+        "labelAlign": "left",
+        "labelExpr": "datum.label[0]"
+      }
+    },
+    "y": {"aggregate": "mean", "field": "precipitation"}
+  }
+}
+"""
+
+Vl.new(description: "Using `labelExpr` to show only initial letters of month names.")
+|> Vl.data_from_url(url <> "data/seattle-weather.csv")
+|> Vl.mark(:bar)
+|> Vl.encode(:x,
+  time_unit: "month",
+  field: "date",
+  axis: [label_align: "left", label_expr: "datum.label[0]"]
+)
+|> Vl.encode(:y, aggregate: "mean", field: "precipitation")
+```
+
+### Bar Chart with bars center-aligned with time unit ticks
+
+It looks like BandPosition is not working. The json spec also doesn't produce the expected output.
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {"url": "https://vega.github.io/editor/data/seattle-weather.csv"},
+  "mark": "bar",
+  "encoding": {
+    "x": {"timeUnit": "month", "field": "date", "type": "temporal", "bandPosition": 0},
+    "y": {"aggregate": "mean", "field": "precipitation"}
+  }
+}
+"""
+
+Vl.new()
+|> Vl.data_from_url(url <> "data/seattle-weather.csv")
+|> Vl.mark(:bar)
+|> Vl.encode(:x, time_unit: "month", field: "date", type: :temporal, band_position: 0)
+|> Vl.encode(:y, aggregate: "mean", field: "precipitation")
+
+# |> Vl.to_spec()
+```
+
+### Bar Chart with Negative Values and a Zero-Baseline
+
+```elixir
+spec = """
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "A bar chart with negative values. We can hide the axis domain line, and instead use a conditional grid color to draw a zero baseline.",
+  "data": {
+    "values": [
+      {"a": "A", "b": -28}, {"a": "B", "b": 55}, {"a": "C", "b": -33},
+      {"a": "D", "b": 91}, {"a": "E", "b": 81}, {"a": "F", "b": 53},
+      {"a": "G", "b": -19}, {"a": "H", "b": 87}, {"a": "I", "b": 52}
+    ]
+  },
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "field": "a", "type": "nominal",
+      "axis": {
+        "domain": false,
+        "ticks": false,
+        "labelAngle": 0,
+        "labelPadding": 4
+      }
+    },
+    "y": {
+      "field": "b", "type": "quantitative",
+      "axis": {
+        "gridColor": {
+          "condition": {"test": "datum.value === 0", "value": "black"},
+          "value": "#ddd"
+        }
+      }
+    }
+  }
+}
+"""
+
+Vl.new()
+|> Vl.data_from_values([
+  %{"a" => "A", "b" => -28},
+  %{"a" => "B", "b" => 55},
+  %{"a" => "C", "b" => -33},
+  %{"a" => "D", "b" => 91},
+  %{"a" => "E", "b" => 81},
+  %{"a" => "F", "b" => 53},
+  %{"a" => "G", "b" => -19},
+  %{"a" => "H", "b" => 87},
+  %{"a" => "I", "b" => 52}
+])
+|> Vl.mark(:bar)
+|> Vl.encode(:x,
+  field: "a",
+  type: :nominal,
+  axis: [domain: false, ticks: false, label_angle: 0, label_padding: 4]
+)
+|> Vl.encode(:y,
+  field: "b",
+  type: :quantitative,
+  axis: [grid_color: [condition: [test: "datum.value === 0", value: "black"], value: "#ddd"]]
+)
+```
